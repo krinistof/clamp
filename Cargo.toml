@@ -2,7 +2,7 @@
 name = "clamp"
 version = "0.1.0"
 edition = "2024"
-author = "Kristóf Kovács <kristof@mntr.dev>"
+authors = ["Kristóf Kovács" "Ifa <kristof@mntr.dev>"]
 
 
 [dependencies]

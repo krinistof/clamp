@@ -6,7 +6,7 @@ use std::{
     collections::BTreeMap,
     fmt::Write,
     fs, io,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, process::ExitCode,
 };
 
 /// Represents the data stored in the .clamp.lock file.
@@ -59,11 +59,11 @@ pub fn process_template(template_path: &Path) -> Result<ProcessResult> {
 
     let base_dir = template_path
         .parent()
-        .context("Template path must have a parent directory")?; // Slightly better context
+        .context("Template path must have a parent directory")?;
 
-    // Regex to find [[include: path/to/file.ext]], allowing whitespace around the path.
+    // regex for [[include: path/to/file.ext]], allowing whitespace around the path.
     let include_regex =
-        Regex::new(r"\[\[include:\s*(.*?)\s*\]\]").expect("Failed to compile include regex"); // Regex is static, panic if invalid
+        Regex::new(r"\[\[include:\s*(.*?)\s*\]\]").expect("Failed to compile include regex");
 
     let mut output_buffer = String::with_capacity(template_content.len());
     let mut current_pos = 0;
@@ -74,13 +74,11 @@ pub fn process_template(template_path: &Path) -> Result<ProcessResult> {
         let path_match = cap.get(1).unwrap(); // The path inside
         let relative_path_str = path_match.as_str().trim(); // Trim whitespace just in case
 
-        // Append text before the match
+        // append text before the match
         output_buffer.push_str(&template_content[current_pos..full_match.start()]);
 
-        // Resolve the include path relative to the template's directory
         let include_path = base_dir.join(relative_path_str);
 
-        // Check if file exists before attempting to canonicalize or read
         if !include_path.exists() {
             bail!(
                 "Include directive error: File not found at resolved path '{}' (referenced in '{}' as '{}')",
@@ -89,7 +87,6 @@ pub fn process_template(template_path: &Path) -> Result<ProcessResult> {
                 relative_path_str
             );
         }
-        // Canonicalize path for consistent keys in hash maps and lock file
         let canonical_path = fs::canonicalize(&include_path).with_context(|| {
             format!(
                 "Failed to canonicalize include path '{}'",
@@ -97,7 +94,6 @@ pub fn process_template(template_path: &Path) -> Result<ProcessResult> {
             )
         })?;
 
-        // Read file content as bytes for hashing
         let included_content_bytes = fs::read(&canonical_path).with_context(|| {
             format!(
                 "Failed to read included file '{}'",
@@ -105,13 +101,10 @@ pub fn process_template(template_path: &Path) -> Result<ProcessResult> {
             )
         })?;
 
-        // Calculate hash
         let hash = calculate_hash(&included_content_bytes);
 
-        // Store hash using the canonical path
         current_hashes.insert(canonical_path.clone(), hash); // Clone path for insertion
 
-        // Convert included content to string (assuming UTF-8)
         let content_str = String::from_utf8(included_content_bytes).with_context(|| {
             format!(
                 "Included file '{}' does not contain valid UTF-8 content",
@@ -119,7 +112,6 @@ pub fn process_template(template_path: &Path) -> Result<ProcessResult> {
             )
         })?;
 
-        // Determine language hint for markdown block
         let lang_hint = include_path
             .extension()
             .and_then(|os_str| os_str.to_str())
@@ -127,14 +119,13 @@ pub fn process_template(template_path: &Path) -> Result<ProcessResult> {
 
         // Format and append the included content block
         // Use writeln! style formatting for clarity if multi-line
-        write!(output_buffer, "```{lang_hint}\n{content_str}\n```")
+        write!(output_buffer, "```{lang_hint}\n{content_str}\n```\n")
             .expect("Writing to String buffer failed unexpectedly");
 
-        // Update current position in template content
         current_pos = full_match.end();
     }
 
-    // Append any remaining text after the last include
+    // append remaining text after the last include
     output_buffer.push_str(&template_content[current_pos..]);
 
     Ok(ProcessResult {
@@ -224,4 +215,16 @@ pub fn get_lockfile_path(template_path: &Path) -> PathBuf {
         .unwrap_or_else(|| "lock".to_string());
 
     template_path.with_extension(extension)
+}
+
+/// Writes a sample .clamp file to given path, othervise `problem.clamp`
+pub fn init(new: Option<PathBuf>) -> Result<ExitCode> {
+    const SAMPLE: &str = "
+TL;DR how to use this?
+
+[[include: README.md]]";
+
+    let path = new.unwrap_or("problem.clamp".into());
+    fs::write(path, SAMPLE)?;
+    Ok(ExitCode::SUCCESS)
 }

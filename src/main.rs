@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use clamp_lib::{
     LockfileData, compare_hashes, get_lockfile_path, process_template, read_lockfile,
-    write_lockfile,
+    write_lockfile, init
 };
 use clap::Parser;
 use clap_complete::{Shell, generate};
@@ -37,11 +37,19 @@ enum Commands {
         #[clap(value_parser, required = true)]
         template_path: PathBuf,
     },
+
     /// Generate shell completion scripts
     Completions {
         /// The shell to generate completions for
-        #[clap(value_parser = clap::value_parser!(Shell))] // Use clap's Shell enum parser
+        #[clap(value_parser = clap::value_parser!(Shell))]
         shell: Shell,
+    },
+
+    /// Create a sample .clamp file
+    Init {
+        /// Path to where create sample .clamp
+        #[clap(value_parser)]
+        new: Option<PathBuf>,
     },
 }
 
@@ -66,6 +74,9 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
             run_generate_completions(shell)
+        }
+        Some(Commands::Init { new }) => {
+            init(new)
         }
         // Example if you add an explicit Build command:
         // Some(Commands::Build { template_path }) => { ... }
