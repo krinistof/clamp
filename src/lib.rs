@@ -119,7 +119,7 @@ pub fn process_template(template_path: &Path) -> Result<ProcessResult> {
 
         // Format and append the included content block
         // Use writeln! style formatting for clarity if multi-line
-        write!(output_buffer, "```{lang_hint}\n{content_str}\n```\n")
+        write!(output_buffer, "Contents of {relative_path_str}:\n```{lang_hint}\n{content_str}\n```\n")
             .expect("Writing to String buffer failed unexpectedly");
 
         current_pos = full_match.end();
